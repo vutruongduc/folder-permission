@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const DataAccess = require('./dataAccess');
+const Storage = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,15 +11,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Initialize data access layer
-const dataAccess = new DataAccess();
+// Initialize storage layer
+const storage = new Storage();
 
 // Routes
 
 // Get all teams
-app.get('/api/teams', async (req, res) => {
+app.get('/api/teams', (req, res) => {
   try {
-    const teams = await dataAccess.getAllTeams();
+    const teams = storage.getAllTeams();
     res.json(teams);
   } catch (error) {
     console.error('Error getting teams:', error);
@@ -28,9 +28,9 @@ app.get('/api/teams', async (req, res) => {
 });
 
 // Get team by ID
-app.get('/api/teams/:id', async (req, res) => {
+app.get('/api/teams/:id', (req, res) => {
   try {
-    const team = await dataAccess.getTeamById(parseInt(req.params.id));
+    const team = storage.getTeamById(parseInt(req.params.id));
     if (!team) {
       return res.status(404).json({ error: 'Team not found' });
     }
@@ -42,14 +42,14 @@ app.get('/api/teams/:id', async (req, res) => {
 });
 
 // Create new team
-app.post('/api/teams', async (req, res) => {
+app.post('/api/teams', (req, res) => {
   try {
     const { name, folders } = req.body;
     if (!name || !folders || !Array.isArray(folders)) {
       return res.status(400).json({ error: 'Name and folders array are required' });
     }
     
-    const newTeam = await dataAccess.createTeam(name, folders);
+    const newTeam = storage.createTeam(name, folders);
     res.status(201).json(newTeam);
   } catch (error) {
     console.error('Error creating team:', error);
@@ -58,7 +58,7 @@ app.post('/api/teams', async (req, res) => {
 });
 
 // Update team
-app.put('/api/teams/:id', async (req, res) => {
+app.put('/api/teams/:id', (req, res) => {
   try {
     const teamId = parseInt(req.params.id);
     const { name, folders } = req.body;
@@ -67,7 +67,7 @@ app.put('/api/teams/:id', async (req, res) => {
       return res.status(400).json({ error: 'Name and folders array are required' });
     }
     
-    const updatedTeam = await dataAccess.updateTeam(teamId, name, folders);
+    const updatedTeam = storage.updateTeam(teamId, name, folders);
     res.json(updatedTeam);
   } catch (error) {
     console.error('Error updating team:', error);
@@ -76,10 +76,10 @@ app.put('/api/teams/:id', async (req, res) => {
 });
 
 // Delete team
-app.delete('/api/teams/:id', async (req, res) => {
+app.delete('/api/teams/:id', (req, res) => {
   try {
     const teamId = parseInt(req.params.id);
-    await dataAccess.deleteTeam(teamId);
+    storage.deleteTeam(teamId);
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting team:', error);
@@ -88,9 +88,9 @@ app.delete('/api/teams/:id', async (req, res) => {
 });
 
 // Get all users with effective folders
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', (req, res) => {
   try {
-    const users = await dataAccess.getAllUsers();
+    const users = storage.getAllUsers();
     res.json(users);
   } catch (error) {
     console.error('Error getting users:', error);
@@ -99,9 +99,9 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Get user by ID
-app.get('/api/users/:id', async (req, res) => {
+app.get('/api/users/:id', (req, res) => {
   try {
-    const user = await dataAccess.getUserById(parseInt(req.params.id));
+    const user = storage.getUserById(parseInt(req.params.id));
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
@@ -113,7 +113,7 @@ app.get('/api/users/:id', async (req, res) => {
 });
 
 // Create new user
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', (req, res) => {
   try {
     const { name, teamId, customFolders } = req.body;
     
@@ -122,12 +122,12 @@ app.post('/api/users', async (req, res) => {
     }
     
     // Validate team exists
-    const team = await dataAccess.getTeamById(teamId);
+    const team = storage.getTeamById(teamId);
     if (!team) {
       return res.status(400).json({ error: 'Team does not exist' });
     }
     
-    const newUser = await dataAccess.createUser(name, teamId, customFolders);
+    const newUser = storage.createUser(name, teamId, customFolders);
     res.status(201).json(newUser);
   } catch (error) {
     console.error('Error creating user:', error);
@@ -136,7 +136,7 @@ app.post('/api/users', async (req, res) => {
 });
 
 // Update user
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', (req, res) => {
   try {
     const userId = parseInt(req.params.id);
     const { name, teamId, customFolders } = req.body;
@@ -146,12 +146,12 @@ app.put('/api/users/:id', async (req, res) => {
     }
     
     // Validate team exists
-    const team = await dataAccess.getTeamById(teamId);
+    const team = storage.getTeamById(teamId);
     if (!team) {
       return res.status(400).json({ error: 'Team does not exist' });
     }
     
-    const updatedUser = await dataAccess.updateUser(userId, name, teamId, customFolders);
+    const updatedUser = storage.updateUser(userId, name, teamId, customFolders);
     res.json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
@@ -160,16 +160,16 @@ app.put('/api/users/:id', async (req, res) => {
 });
 
 // Delete user
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    await dataAccess.deleteUser(userId);
+    storage.deleteUser(userId);
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting user:', error);
     res.status(500).json({ error: error.message || 'Failed to delete user' });
   }
-});
+ });
 
 // Serve the main HTML file
 app.get('/', (req, res) => {
@@ -179,18 +179,18 @@ app.get('/', (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log('Database initialized with SQLite');
+  console.log('Storage initialized with JSON files');
 });
 
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\nShutting down gracefully...');
-  dataAccess.close();
+  storage.close();
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('\nShutting down gracefully...');
-  dataAccess.close();
+  storage.close();
   process.exit(0);
 });
