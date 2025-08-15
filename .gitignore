@@ -4,11 +4,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Database files
-data/
-*.db
-*.sqlite
-*.sqlite3
+github_users.json
 
 # Environment variables
 .env

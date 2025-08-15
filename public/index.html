@@ -9,6 +9,11 @@
     <link href="styles.css" rel="stylesheet">
 </head>
 <body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+        <i class="bi bi-sun-fill" id="themeIcon"></i>
+    </button>
+    
     <div class="container-fluid">
         <!-- Header -->
         <div class="row bg-primary text-white py-3 mb-4">
@@ -68,6 +73,7 @@
                                 <th>ID</th>
                                 <th>Team Name</th>
                                 <th>Folders</th>
+                                <th>Members</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -107,6 +113,7 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>ID</th>
+                                <th>Avatar</th>
                                 <th>Name</th>
                                 <th>Team</th>
                                 <th>Custom Folders</th>
@@ -137,11 +144,11 @@
                         <input type="hidden" id="teamId">
                         <div class="mb-3">
                             <label for="teamName" class="form-label">Team Name</label>
-                            <input type="text" class="form-control" id="teamName" required>
+                            <input type="text" class="form-control" id="teamName" name="teamName" required>
                         </div>
                         <div class="mb-3">
                             <label for="teamFolders" class="form-label">Folders (one per line)</label>
-                            <textarea class="form-control" id="teamFolders" rows="5" placeholder="/folder1&#10;/folder2&#10;/folder3" required></textarea>
+                            <textarea class="form-control" id="teamFolders" name="teamFolders" rows="5" placeholder="/folder1&#10;/folder2&#10;/folder3" required></textarea>
                             <div class="form-text">Enter each folder path on a new line, starting with /</div>
                         </div>
                     </form>
@@ -149,6 +156,45 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary" onclick="saveTeam()">Save Team</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Details Modal -->
+    <div class="modal fade" id="teamDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="teamDetailsTitle">Team Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Default Folders</h6>
+                            <div id="teamFoldersList" class="mb-3">
+                                <!-- Folders will be populated here -->
+                            </div>
+                            
+                            <h6>Team Statistics</h6>
+                            <div class="mb-3">
+                                <p><strong>Total Members:</strong> <span id="teamMemberCount">0</span></p>
+                                <p><strong>Users with Custom Folders:</strong> <span id="teamCustomFoldersCount">0</span></p>
+                                <p><strong>Users Inheriting Default:</strong> <span id="teamInheritingCount">0</span></p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Team Members</h6>
+                            <div id="teamMembersList" class="mb-3">
+                                <!-- Members will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="editTeamFromDetails()">Edit Team</button>
                 </div>
             </div>
         </div>
@@ -167,18 +213,19 @@
                         <input type="hidden" id="userId">
                         <div class="mb-3">
                             <label for="userName" class="form-label">User Name</label>
-                            <input type="text" class="form-control" id="userName" required>
+                            <input type="text" class="form-control" id="userName" name="userName" required>
                         </div>
                         <div class="mb-3">
-                            <label for="userTeam" class="form-label">Team</label>
-                            <select class="form-select" id="userTeam" required>
-                                <option value="">Select a team...</option>
+                            <label for="userTeam" class="form-label">Team (Optional)</label>
+                            <select class="form-select" id="userTeam" name="userTeam">
+                                <option value="">No Team</option>
                             </select>
+                            <div class="form-text">Default: "No Team" - Users without teams have no inherited folders</div>
                         </div>
                         <div class="mb-3">
                             <label for="userCustomFolders" class="form-label">Custom Folders (optional)</label>
-                            <textarea class="form-control" id="userCustomFolders" rows="5" placeholder="/custom1&#10;/custom2&#10;/custom3"></textarea>
-                            <div class="form-text">Leave empty to use team's default folders. Enter each folder path on a new line, starting with /</div>
+                            <textarea class="form-control" id="userCustomFolders" name="userCustomFolders" rows="5" placeholder="/custom1&#10;/custom2&#10;/custom3"></textarea>
+                            <div class="form-text">Leave empty for no custom folders. If user has no team, this will be their only folder list</div>
                         </div>
                     </form>
                 </div>
