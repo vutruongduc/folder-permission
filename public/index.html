@@ -141,7 +141,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="teamForm">
-                        <input type="hidden" id="teamId">
+                        <input type="hidden" id="teamId" name="teamId">
                         <div class="mb-3">
                             <label for="teamName" class="form-label">Team Name</label>
                             <input type="text" class="form-control" id="teamName" name="teamName" required>
@@ -150,6 +150,50 @@
                             <label for="teamFolders" class="form-label">Folders (one per line)</label>
                             <textarea class="form-control" id="teamFolders" name="teamFolders" rows="5" placeholder="/folder1&#10;/folder2&#10;/folder3" required></textarea>
                             <div class="form-text">Enter each folder path on a new line, starting with /</div>
+                        </div>
+                        
+                        <!-- Add Users Section -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Add Users (Optional)</label>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="toggleAddUsersSection()">
+                                    <i class="bi bi-plus-circle"></i> Show/Hide
+                                </button>
+                            </div>
+                            <div id="addUsersSection" class="border rounded p-3" style="display: none;">
+                                <div class="mb-3">
+                                    <small class="text-muted">Search and add existing users to this team. Users without teams will be shown first.</small>
+                                </div>
+                                
+                                <!-- Search Bar -->
+                                <div class="mb-3">
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="userSearchInput" placeholder="Search users by name..." oninput="searchUsersForTeam(this.value)">
+                                        <button class="btn btn-outline-secondary" type="button" onclick="clearUserSearch()">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Search Results -->
+                                <div id="userSearchResults" class="mb-3" style="display: none;">
+                                    <h6 class="mb-2">Search Results</h6>
+                                    <div id="userSearchList" class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+                                        <!-- Search results will be populated here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Selected Users -->
+                                <div id="selectedUsersSection" class="mb-3" style="display: none;">
+                                    <h6 class="mb-2">Selected Users</h6>
+                                    <div id="selectedUsersList" class="border rounded p-2">
+                                        <!-- Selected users will be shown here -->
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden input to store selected user IDs -->
+                                <input type="hidden" id="selectedUserIds" name="selectedUserIds" value="">
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -181,7 +225,8 @@
                             <div class="mb-3">
                                 <p><strong>Total Members:</strong> <span id="teamMemberCount">0</span></p>
                                 <p><strong>Users with Custom Folders:</strong> <span id="teamCustomFoldersCount">0</span></p>
-                                <p><strong>Users Inheriting Default:</strong> <span id="teamInheritingCount">0</span></p>
+                                <p><strong>Users with Both Folders:</strong> <span id="teamBothFoldersCount">0</span></p>
+                                <p><strong>Users with Team Folders Only:</strong> <span id="teamTeamFoldersCount">0</span></p>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -210,7 +255,7 @@
                 </div>
                 <div class="modal-body">
                     <form id="userForm">
-                        <input type="hidden" id="userId">
+                        <input type="hidden" id="userId" name="userId">
                         <div class="mb-3">
                             <label for="userName" class="form-label">User Name</label>
                             <input type="text" class="form-control" id="userName" name="userName" required>
@@ -225,7 +270,7 @@
                         <div class="mb-3">
                             <label for="userCustomFolders" class="form-label">Custom Folders (optional)</label>
                             <textarea class="form-control" id="userCustomFolders" name="userCustomFolders" rows="5" placeholder="/custom1&#10;/custom2&#10;/custom3"></textarea>
-                            <div class="form-text">Leave empty for no custom folders. If user has no team, this will be their only folder list</div>
+                            <div class="form-text">Leave empty for no custom folders. If user belongs to a team, custom folders will be ADDED to team folders</div>
                         </div>
                     </form>
                 </div>

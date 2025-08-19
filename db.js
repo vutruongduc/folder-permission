@@ -302,7 +302,7 @@ const db = {
                     END as custom_folders,
                     CASE 
                         WHEN custom_folders[1] IS NULL THEN team_folders
-                        ELSE custom_folders
+                        ELSE array_cat(team_folders, custom_folders)
                     END as effective_folders,
                     CASE 
                         WHEN custom_folders[1] IS NULL THEN true
@@ -366,7 +366,7 @@ const db = {
                 END as custom_folders,
                 CASE 
                     WHEN custom_folders[1] IS NULL THEN team_folders
-                    ELSE custom_folders
+                    ELSE array_cat(team_folders, custom_folders)
                 END as effective_folders,
                 CASE 
                     WHEN custom_folders[1] IS NULL THEN true

@@ -34,26 +34,27 @@
 
 /* Theme variables */
 :root[data-theme="light"] {
-    --bg-primary: #f8f9fa;
-    --bg-secondary: #ffffff;
-    --text-primary: #2c3136;
-    --text-secondary: #495057;
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --text-primary: #000000;
+    --text-secondary: #6c757d;
     --border-color: #dee2e6;
     --header-bg: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     --header-text: #ffffff;
-    --table-header-bg: #e9ecef;
+    --table-header-bg: #343a40;
+    --table-header-text: #ffffff;
     --table-stripe: #f8f9fa;
     --table-hover: #e9ecef;
     --btn-close-filter: none;
     --modal-bg: #ffffff;
     --modal-header: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     --input-bg: #ffffff;
-    --input-text: #495057;
+    --input-text: #000000;
     --input-border: #ced4da;
     --nav-active-bg: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
     --nav-active-text: #ffffff;
-    --nav-hover-bg: #f8f9fa;
-    --nav-hover-text: #495057;
+    --nav-hover-bg: #e9ecef;
+    --nav-hover-text: #000000;
     --folder-badge-bg: linear-gradient(135deg, #28a745 0%, #20c997 100%);
     --folder-badge-text: #ffffff;
     --folder-team-bg: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
@@ -61,26 +62,27 @@
 }
 
 :root[data-theme="dark"] {
-    --bg-primary: #212529;
-    --bg-secondary: #343a40;
-    --text-primary: #f8f9fa;
-    --text-secondary: #adb5bd;
-    --border-color: #495057;
+    --bg-primary: #121212;
+    --bg-secondary: #1e1e1e;
+    --text-primary: #ffffff;
+    --text-secondary: #b0b0b0;
+    --border-color: #404040;
     --header-bg: linear-gradient(135deg, #0056b3 0%, #004085 100%);
     --header-text: #ffffff;
-    --table-header-bg: #1a1d20;
-    --table-stripe: #2c3136;
-    --table-hover: #3d444a;
+    --table-header-bg: #2d2d2d;
+    --table-header-text: #ffffff;
+    --table-stripe: #1a1a1a;
+    --table-hover: #2a2a2a;
     --btn-close-filter: invert(1);
-    --modal-bg: #343a40;
-    --modal-header: linear-gradient(135deg, #343a40 0%, #2c3136 100%);
-    --input-bg: #2c3136;
-    --input-text: #f8f9fa;
-    --input-border: #495057;
+    --modal-bg: #1e1e1e;
+    --modal-header: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+    --input-bg: #2d2d2d;
+    --input-text: #ffffff;
+    --input-border: #404040;
     --nav-active-bg: linear-gradient(135deg, #0056b3 0%, #004085 100%);
     --nav-active-text: #ffffff;
-    --nav-hover-bg: #3d444a;
-    --nav-hover-text: #f8f9fa;
+    --nav-hover-bg: #2a2a2a;
+    --nav-hover-text: #ffffff;
     --folder-badge-bg: linear-gradient(135deg, #20c997 0%, #1ba97c 100%);
     --folder-badge-text: #ffffff;
     --folder-team-bg: linear-gradient(135deg, #138496 0%, #0f6674 100%);
@@ -102,15 +104,16 @@ body {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    border: none;
+    border: 2px solid var(--border-color);
     background-color: var(--bg-secondary);
     color: var(--text-primary);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
+    font-size: 1.2rem;
 }
 
 .theme-toggle:hover {
@@ -137,7 +140,7 @@ body {
 .table thead th {
     border-bottom: 2px solid var(--border-color);
     font-weight: 600;
-    color: var(--text-primary);
+    color: var(--table-header-text);
     padding: 1rem 0.75rem;
     text-transform: uppercase;
     font-size: 0.875rem;
@@ -202,6 +205,105 @@ body {
     font-weight: 600;
 }
 
+/* Ensure table cells have good contrast */
+.table tbody tr:nth-child(even) {
+    background-color: var(--table-stripe);
+}
+
+.table tbody tr:hover {
+    background-color: var(--table-hover);
+}
+
+.table tbody td {
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+/* Ensure form labels are visible */
+.form-label {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* Ensure help text is visible but not too prominent */
+.form-text {
+    color: var(--text-secondary);
+}
+
+/* Ensure select dropdowns are readable */
+.form-select {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+.form-select:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+/* Custom styling for user search and selection */
+#userSearchResults, #selectedUsersSection {
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+#userSearchList, #selectedUsersList {
+    background-color: var(--bg-secondary);
+}
+
+#userSearchList .border-bottom, #selectedUsersList .border-bottom {
+    border-color: var(--border-color) !important;
+}
+
+#userSearchList .border-bottom:hover {
+    background-color: var(--table-hover);
+}
+
+#userSearchList .border-bottom {
+    transition: background-color 0.2s ease;
+}
+
+/* User search input styling */
+#userSearchInput {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+#userSearchInput:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Clear button styling */
+.btn-outline-secondary {
+    border-color: var(--input-border);
+    color: var(--text-secondary);
+}
+
+.btn-outline-secondary:hover {
+    background-color: var(--text-secondary);
+    border-color: var(--text-secondary);
+    color: var(--bg-secondary);
+}
+
+/* Ensure textarea is readable */
+textarea.form-control {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+textarea.form-control:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
 .badge {
     font-size: 0.8rem;
 }
@@ -242,6 +344,8 @@ body {
 
 .nav-tabs .nav-link {
     color: var(--text-primary);
+    background-color: var(--bg-secondary);
+    border-color: var(--border-color);
 }
 
 .nav-tabs .nav-link:hover {
@@ -254,4 +358,42 @@ body {
     background: var(--nav-active-bg);
     color: var(--nav-active-text);
     border: none;
+    font-weight: 600;
+}
+
+/* Ensure search inputs are visible */
+#teamSearch, #userSearch {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+}
+
+#teamSearch:focus, #userSearch:focus {
+    background-color: var(--input-bg);
+    border-color: var(--input-border);
+    color: var(--input-text);
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Ensure buttons have good contrast */
+.btn {
+    font-weight: 500;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+    color: #ffffff;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: #ffffff;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #ffffff;
 }

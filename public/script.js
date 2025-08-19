@@ -56,11 +56,21 @@ async function fetchUsers() {
         }
         const data = await response.json();
         users = Array.isArray(data) ? data : [];
+        
+        // Debug logging
+        console.log('Fetched users:', users.length);
+        console.log('Sample user:', users[0]);
+        console.log('Users with team_id:', users.filter(u => u.team_id).length);
+        console.log('Users with team_id = 4:', users.filter(u => u.team_id === 4).length);
+        
         renderUsersTable();
+        // Re-render teams table to update member counts now that users are loaded
+        renderTeamsTable();
     } catch (error) {
         console.error('Error fetching users:', error);
         users = [];
         renderUsersTable();
+        renderTeamsTable();
     }
 }
 
@@ -70,10 +80,14 @@ function renderTeamsTable(teamsToRender = teams) {
     tbody.innerHTML = '';
     
     teamsToRender.forEach(team => {
-        // Count team members
-        const teamMembers = users.filter(user => user.teamId === team.id);
-        const membersWithCustomFolders = teamMembers.filter(user => user.customFolders && user.customFolders.length > 0);
-        const membersInheritingDefault = teamMembers.filter(user => user.isUsingTeamDefault);
+        // Count team members using the correct field name
+        const teamMembers = users.filter(user => user.team_id === team.id);
+        const membersWithCustomFolders = teamMembers.filter(user => user.custom_folders && user.custom_folders.length > 0);
+        const membersInheritingDefault = teamMembers.filter(user => user.is_using_team_default);
+        
+        // Debug logging
+        console.log(`Team ${team.name} (ID: ${team.id}): ${teamMembers.length} members`);
+        console.log('Team members:', teamMembers.map(u => ({ id: u.id, name: u.name, team_id: u.team_id })));
         
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -121,10 +135,10 @@ function renderUsersTable(usersToRender = users) {
                     user.name
                 }
             </td>
-            <td>${user.teamName || 'No Team'}</td>
-            <td>${renderFolderBadges(user.customFolders || [], 'custom')}</td>
-            <td>${renderFolderBadges(user.effectiveFolders || [], user.isUsingTeamDefault ? 'team' : 'custom')}</td>
-            <td>${user.isUsingTeamDefault ? 
+            <td>${user.team_name || 'No Team'}</td>
+            <td>${renderFolderBadges(user.custom_folders || [], 'custom')}</td>
+            <td>${renderFolderBadges(user.effective_folders || [], user.is_using_team_default ? 'team' : 'custom')}</td>
+            <td>${user.is_using_team_default ? 
                 '<span class="badge bg-info">Using Team Default</span>' : 
                 '<span class="badge bg-warning">Custom Config</span>'
             }</td>
@@ -204,13 +218,6 @@ async function saveTeam() {
     const name = formData.get('teamName');
     const folders = formData.get('teamFolders').split('\n').map(f => f.trim()).filter(f => f);
     
-    // Debug logging
-    console.log('saveTeam called with:', { teamId, name, folders });
-    console.log('Form data entries:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`  ${key}: ${value}`);
-    }
-    
     if (!name || !folders.length) {
         alert('Please fill in all required fields');
         return;
@@ -218,34 +225,254 @@ async function saveTeam() {
     
     try {
         let response;
+        let newTeam;
+        
         if (teamId) {
-            console.log(`Updating existing team with ID: ${teamId}`);
             // Update existing team
             response = await fetch(`/api/teams/${teamId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, folders })
             });
+            newTeam = await response.json();
         } else {
-            console.log('Creating new team (no teamId found)');
             // Create new team
             response = await fetch('/api/teams', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, folders })
             });
+            newTeam = await response.json();
+            
+            // If creating new team, check if we need to add users
+            if (newTeam && newTeam.id) {
+                await addUsersToTeam(newTeam.id, formData);
+            }
         }
         
         if (!response.ok) throw new Error('Failed to save team');
         
-        await fetchTeams();
+        await Promise.all([fetchTeams(), fetchUsers()]);
         bootstrap.Modal.getInstance(document.getElementById('teamModal')).hide();
         form.reset();
         document.getElementById('teamModalTitle').textContent = 'Add Team';
+        hideAddUsersSection(); // Hide the users section after saving
     } catch (error) {
         console.error('Error saving team:', error);
         alert('Failed to save team');
     }
+}
+
+// Function to toggle the add users section visibility
+function toggleAddUsersSection() {
+    const section = document.getElementById('addUsersSection');
+    const button = event.target.closest('button');
+    const icon = button.querySelector('i');
+    
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        icon.className = 'bi bi-dash-circle';
+        button.innerHTML = '<i class="bi bi-dash-circle"></i> Hide';
+        // Reset selected users when opening
+        selectedUsers = [];
+        document.getElementById('selectedUserIds').value = '';
+        document.getElementById('userSearchInput').value = '';
+        document.getElementById('userSearchResults').style.display = 'none';
+        document.getElementById('selectedUsersSection').style.display = 'none';
+    } else {
+        section.style.display = 'none';
+        icon.className = 'bi bi-plus-circle';
+        button.innerHTML = '<i class="bi bi-plus-circle"></i> Show';
+    }
+}
+
+// Function to hide the add users section
+function hideAddUsersSection() {
+    const section = document.getElementById('addUsersSection');
+    const button = document.querySelector('button[onclick="toggleAddUsersSection()"]');
+    const icon = button.querySelector('i');
+    
+    section.style.display = 'none';
+    icon.className = 'bi bi-plus-circle';
+    button.innerHTML = '<i class="bi bi-plus-circle"></i> Show';
+    
+    // Reset selected users
+    selectedUsers = [];
+    document.getElementById('selectedUserIds').value = '';
+}
+
+// Global variables for user selection
+let selectedUsers = [];
+
+// Function to search users for team assignment
+function searchUsersForTeam(searchTerm) {
+    if (!searchTerm || searchTerm.trim() === '') {
+        document.getElementById('userSearchResults').style.display = 'none';
+        return;
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    // Filter users based on search term
+    const filteredUsers = users.filter(user => 
+        user.name.toLowerCase().includes(searchLower) ||
+        (user.github_login && user.github_login.toLowerCase().includes(searchLower))
+    );
+    
+    // Sort: users without teams first, then users with teams
+    const sortedUsers = filteredUsers.sort((a, b) => {
+        if (!a.teamId && b.teamId) return -1;
+        if (a.teamId && !b.teamId) return 1;
+        return a.name.localeCompare(b.name);
+    });
+    
+    displayUserSearchResults(sortedUsers);
+}
+
+// Function to display user search results
+function displayUserSearchResults(users) {
+    const resultsDiv = document.getElementById('userSearchResults');
+    const listDiv = document.getElementById('userSearchList');
+    
+    if (users.length === 0) {
+        listDiv.innerHTML = '<p class="text-muted mb-0">No users found matching your search.</p>';
+        resultsDiv.style.display = 'block';
+        return;
+    }
+    
+    listDiv.innerHTML = users.map(user => {
+        const avatar = user.avatar_url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjNmM3NTdkIi8+CjxwYXRoIGQ9Ik0xMCAxMEMxMi43NjEgMTAgMTUgNy43NjEgMTUgNUExMCA1IDEwIDVMMTAgMTBaIiBmaWxsPSIjZjhmOWZhIi8+CjxwYXRoIGQ9Ik0xNSAxNUMxNSAxMi4yMzkgMTIuNzYxIDEwIDEwIDEwUzUgMTIuMjM5IDUgMTVIMTVaIiBmaWxsPSIjZjhmOWZhIi8+Cjwvc3ZnPgo=';
+        const isSelected = selectedUsers.some(selected => selected.id === user.id);
+        const isAlreadyInTeam = user.team_id;
+        
+        return `
+            <div class="d-flex align-items-center justify-content-between p-2 border-bottom ${isSelected ? 'bg-light' : ''}" style="cursor: pointer;" onclick="toggleUserSelection(${user.id})">
+                <div class="d-flex align-items-center">
+                    <img src="${avatar}" alt="${user.name}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 12px;">
+                    <div>
+                        <div class="fw-bold">${user.name}</div>
+                        <small class="text-muted">@${user.github_login}</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    ${isAlreadyInTeam ? `<span class="badge bg-secondary">${user.team_name}</span>` : '<span class="badge bg-success">No Team</span>'}
+                    ${isSelected ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-plus-circle text-primary"></i>'}
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    resultsDiv.style.display = 'block';
+}
+
+// Function to toggle user selection
+function toggleUserSelection(userId) {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    
+    const existingIndex = selectedUsers.findIndex(selected => selected.id === userId);
+    
+    if (existingIndex !== -1) {
+        // Remove user from selection
+        selectedUsers.splice(existingIndex, 1);
+    } else {
+        // Add user to selection
+        selectedUsers.push({
+            id: user.id,
+            name: user.name,
+            teamId: user.team_id,
+            customFolders: user.custom_folders || []
+        });
+    }
+    
+    // Update hidden input with selected user IDs
+    document.getElementById('selectedUserIds').value = selectedUsers.map(u => u.id).join(',');
+    
+    // Refresh displays
+    displayUserSearchResults(document.getElementById('userSearchInput').value ? 
+        users.filter(u => u.name.toLowerCase().includes(document.getElementById('userSearchInput').value.toLowerCase())) : 
+        []
+    );
+    displaySelectedUsers();
+}
+
+// Function to display selected users
+function displaySelectedUsers() {
+    const section = document.getElementById('selectedUsersSection');
+    const list = document.getElementById('selectedUsersList');
+    
+    if (selectedUsers.length === 0) {
+        section.style.display = 'none';
+        return;
+    }
+    
+    list.innerHTML = selectedUsers.map(user => {
+        const avatar = user.avatar_url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjNmM3NTdkIi8+CjxwYXRoIGQ9Ik0xMCAxMEMxMi43NjEgMTAgMTUgNy43NjEgMTUgNUExMCA1IDEwIDVMMTAgMTBaIiBmaWxsPSIjZjhmOWZhIi8+CjxwYXRoIGQ9Ik0xNSAxNUMxNSAxMi4yMzkgMTIuNzYxIDEwIDEwIDEwUzUgMTIuMjM5IDUgMTVIMTVaIiBmaWxsPSIjZjhmOWZhIi8+Cjwvc3ZnPgo=';
+        
+        return `
+            <div class="d-flex align-items-center justify-content-between p-2 border-bottom">
+                <div class="d-flex align-items-center">
+                    <img src="${avatar}" alt="${user.name}" style="width: 32px; height: 32px; border-radius: 50%; margin-right: 12px;">
+                    <div>
+                        <div class="fw-bold">${user.name}</div>
+                        <small class="text-muted">@${user.github_login}</small>
+                    </div>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeSelectedUser(${user.id})">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        `;
+    }).join('');
+    
+    section.style.display = 'block';
+}
+
+// Function to remove a selected user
+function removeSelectedUser(userId) {
+    selectedUsers = selectedUsers.filter(user => user.id !== userId);
+    document.getElementById('selectedUserIds').value = selectedUsers.map(u => u.id).join(',');
+    displaySelectedUsers();
+    
+    // Refresh search results if search is active
+    const searchTerm = document.getElementById('userSearchInput').value;
+    if (searchTerm) {
+        searchUsersForTeam(searchTerm);
+    }
+}
+
+// Function to clear user search
+function clearUserSearch() {
+    document.getElementById('userSearchInput').value = '';
+    document.getElementById('userSearchResults').style.display = 'none';
+}
+
+// Function to add users to a newly created team
+async function addUsersToTeam(teamId, formData) {
+    if (selectedUsers.length === 0) return; // No users to add
+    
+    // Update each selected user to assign them to the team
+    for (const user of selectedUsers) {
+        try {
+            const response = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: user.name,
+                    teamId: teamId,
+                    customFolders: user.custom_folders
+                })
+            });
+            
+            if (!response.ok) {
+                console.error(`Failed to update user ${user.name}:`, await response.text());
+            }
+        } catch (error) {
+            console.error(`Error updating user ${user.name}:`, error);
+        }
+    }
+    
+    console.log(`Successfully added ${selectedUsers.length} users to team ${teamId}`);
 }
 
 async function createUser(event) {
@@ -285,17 +512,7 @@ async function saveUser() {
     const teamId = teamIdValue ? parseInt(teamIdValue) : null;
     const customFolders = formData.get('userCustomFolders').split('\n').map(f => f.trim()).filter(f => f);
     
-    // Debug logging
-    console.log('saveUser called with:', { userId, name, teamId, customFolders });
-    console.log('Form data entries:');
-    for (let [key, value] of formData.entries()) {
-        console.log(`  ${key}: ${value}`);
-    }
-    
-    // Additional debugging
-    console.log('userId field element:', document.getElementById('userId'));
-    console.log('userId field value:', document.getElementById('userId').value);
-    console.log('userId field type:', document.getElementById('userId').type);
+
     
     if (!name) {
         alert('Please fill in all required fields');
@@ -336,16 +553,11 @@ async function editTeam(id) {
     const team = teams.find(t => t.id === id);
     if (!team) return;
     
-    console.log('editTeam called with:', { id, team });
-    
     // Use the same modal for editing
     document.getElementById('teamModalTitle').textContent = 'Edit Team';
     document.getElementById('teamId').value = team.id;
     document.getElementById('teamName').value = team.name;
     document.getElementById('teamFolders').value = team.folders.join('\n');
-    
-    // Debug: Check if teamId was set
-    console.log('teamId field value after setting:', document.getElementById('teamId').value);
     
     new bootstrap.Modal(document.getElementById('teamModal')).show();
 }
@@ -354,10 +566,11 @@ function showTeamDetails(teamId) {
     const team = teams.find(t => t.id === teamId);
     if (!team) return;
     
-    // Get team members
-    const teamMembers = users.filter(user => user.teamId === teamId);
-    const membersWithCustomFolders = teamMembers.filter(user => user.customFolders && user.customFolders.length > 0);
-    const membersInheritingDefault = teamMembers.filter(user => user.isUsingTeamDefault);
+    // Get team members using the correct field names
+    const teamMembers = users.filter(user => user.team_id === teamId);
+    const membersWithCustomFolders = teamMembers.filter(user => user.custom_folders && user.custom_folders.length > 0);
+    const membersWithBothFolders = teamMembers.filter(user => user.custom_folders && user.custom_folders.length > 0 && user.team_id);
+    const membersWithOnlyTeamFolders = teamMembers.filter(user => (!user.custom_folders || user.custom_folders.length === 0) && user.team_id);
     
     // Update modal title
     document.getElementById('teamDetailsTitle').textContent = `Team Details: ${team.name}`;
@@ -375,21 +588,26 @@ function showTeamDetails(teamId) {
     // Update statistics
     document.getElementById('teamMemberCount').textContent = teamMembers.length;
     document.getElementById('teamCustomFoldersCount').textContent = membersWithCustomFolders.length;
-    document.getElementById('teamInheritingCount').textContent = membersInheritingDefault.length;
+    document.getElementById('teamBothFoldersCount').textContent = membersWithBothFolders.length;
+    document.getElementById('teamTeamFoldersCount').textContent = membersWithOnlyTeamFolders.length;
     
     // Update members list
     const membersList = document.getElementById('teamMembersList');
     if (teamMembers.length > 0) {
         membersList.innerHTML = teamMembers.map(user => `
             <div class="d-flex align-items-center mb-2 p-2 border rounded">
-                <img src="${user.avatarUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNmM3NTdkIi8+CjxwYXRoIGQ9Ik0yMCAyMGM1LjUyMyAwIDEwLTQuNDc3IDEwLTEwUzI1LjUyMyAwIDIwIDBTMTAgNC40NzcgMTAgMTBTMTQuNDc3IDIwIDIwIDIwWiIgZmlsbD0iI2Y4ZjlmYSIvPgo8cGF0aCBkPSJNMzAgMzBjMCA1LjUyMy00LjQ3NyAxMC0xMCAxMFMxMCAzNS41MjMgMTAgMzBIMzBaIiBmaWxsPSIjZjhmOWZhIi8+Cjwvc3ZnPgo='}" 
+                <img src="${user.avatar_url || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNmM3NTdkIi8+CjxwYXRoIGQ9Ik0yMCAyMGM1LjUyMyAwIDEwLTQuNDc3IDEwLTEwUzI1LjUyMyAwIDIwIDBTMTAgNC40NzcgMTAgMTBTMTQuNDc3IDIwIDIwIDIwWiIgZmlsbD0iI2Y4ZjlmYSIvPgo8cGF0aCBkPSJNMzAgMzBjMCA1LjUyMy00LjQ3NyAxMC0xMCAxMFMxMCAzNS41MjMgMTAgMzBIMzBaIiBmaWxsPSIjZjhmOWZhIi8+Cjwvc3ZnPgo='}" 
                      alt="${user.name}" class="avatar me-2" style="width: 32px; height: 32px;">
                 <div class="flex-grow-1">
                     <div class="fw-bold">${user.name}</div>
                     <small class="text-muted">
-                        ${user.customFolders && user.customFolders.length > 0 
-                            ? `<span class="badge bg-warning">Custom folders (${user.customFolders.length})</span>`
-                            : '<span class="badge bg-success">Inheriting default</span>'
+                        ${user.custom_folders && user.custom_folders.length > 0 
+                            ? user.team_id 
+                                ? `<span class="badge bg-info">Custom + Team folders (${user.custom_folders.length} + ${user.effective_folders.length - user.custom_folders.length})</span>`
+                                : `<span class="badge bg-warning">Custom folders (${user.custom_folders.length})</span>`
+                            : user.team_id 
+                                ? '<span class="badge bg-success">Team folders only</span>'
+                                : '<span class="badge bg-secondary">No folders</span>'
                         }
                     </small>
                 </div>
@@ -446,20 +664,13 @@ async function editUser(id) {
     const user = users.find(u => u.id === id);
     if (!user) return;
     
-    console.log('editUser called with:', { id, user });
-    
     // Use the same modal for editing
     document.getElementById('userModalTitle').textContent = 'Edit User';
     document.getElementById('userId').value = user.id;
     document.getElementById('userName').value = user.name;
-    document.getElementById('userTeam').value = user.teamId || '';
-    document.getElementById('userCustomFolders').value = (user.customFolders || []).join('\n');
+            document.getElementById('userCustomFolders').value = (user.custom_folders || []).join('\n');
     
-    // Debug: Check if userId was set
-    console.log('userId field value after setting:', document.getElementById('userId').value);
-    console.log('userId field element after setting:', document.getElementById('userId'));
-    
-    // Populate team dropdown
+    // Populate team dropdown FIRST
     const teamSelect = document.getElementById('userTeam');
     teamSelect.innerHTML = '<option value="">No Team</option>';
     teams.forEach(team => {
@@ -468,6 +679,9 @@ async function editUser(id) {
         option.textContent = team.name;
         teamSelect.appendChild(option);
     });
+    
+    // THEN set the selected value AFTER dropdown is populated
+            document.getElementById('userTeam').value = user.team_id || '';
     
     new bootstrap.Modal(document.getElementById('userModal')).show();
 }
@@ -577,7 +791,7 @@ function setupEventListeners() {
             const searchTerm = this.value.toLowerCase();
             const filteredUsers = users.filter(user => 
                 user.name.toLowerCase().includes(searchTerm) ||
-                (user.teamName && user.teamName.toLowerCase().includes(searchTerm))
+                (user.team_name && user.team_name.toLowerCase().includes(searchTerm))
             );
             renderUsersTable(filteredUsers);
         });
@@ -594,10 +808,11 @@ function initializeModals() {
 }
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     initializeModals();
     setupEventListeners();
-    fetchTeams();
-    fetchUsers();
     initializeTheme();
+    
+    // Load data in parallel and ensure teams table is re-rendered after users are loaded
+    await Promise.all([fetchTeams(), fetchUsers()]);
 });
