@@ -30,7 +30,7 @@ async function importGithubUsers(db) {
                 // Check if this was a new user or an update
                 if (result.wasCreated) {
                     newUsers++;
-                    console.log(`✅ New user imported: ${user.login} (no team assigned)`);
+                    console.log(`🆕 New user created: ${user.login} (no team assigned)`);
                 } else {
                     updatedUsers++;
                     console.log(`🔄 User updated: ${user.login} (preserved existing data)`);

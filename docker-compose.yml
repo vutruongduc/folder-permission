@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: folder_config_db
+    environment:
+      POSTGRES_DB: folder_config
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - folder_config_network
+
+  # Folder Configuration Tool
+  app:
+    build: .
+    container_name: folder_config_app
+    environment:
+      # Database connection
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres_password@postgres:5432/folder_config}
+      
+      # GitHub integration (optional)
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_ORG: ${GITHUB_ORG:-}
+      SKIP_GITHUB_IMPORT: ${SKIP_GITHUB_IMPORT:-false}
+      
+      # Server configuration
+      PORT: ${PORT:-3001}
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Mount scripts for execution
+      - ./get-all-github-users.sh:/app/get-all-github-users.sh
+      - ./check-user-permissions.sh:/app/check-user-permissions.sh
+      - ./import-github-users.js:/app/import-github-users.js
+    networks:
+      - folder_config_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: folder_config_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - folder_config_network
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+
+networks:
+  folder_config_network:
+    driver: bridge
